@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Postman</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .url-input {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .method-select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .send-btn {
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .send-btn:hover {
+            background: #45a049;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .tab {
+            padding: 8px 16px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .tab.active {
+            background: #4CAF50;
+            color: white;
+        }
+        .editor-container {
+            height: 200px;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .response-container {
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .status.success {
+            background: #dff0d8;
+            color: #3c763d;
+        }
+        .status.error {
+            background: #f2dede;
+            color: #a94442;
+        }
+        .query-params {
+            margin-bottom: 20px;
+        }
+        .param-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .param-input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            flex-grow: 1;
+        }
+        .remove-param {
+            padding: 8px;
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .add-param {
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .final-url {
+            margin-top: 10px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Mini Postman</h1>
+        <div class="header">
+            <select class="method-select" id="method">
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+                <option value="PATCH">PATCH</option>
+            </select>
+            <input type="text" id="url" class="url-input" placeholder="Enter request URL">
+            <button class="send-btn" onclick="sendRequest()">Send</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('params')">Query Params</button>
+            <button class="tab" onclick="switchTab('headers')">Headers</button>
+            <button class="tab" onclick="switchTab('body')">Body</button>
+        </div>
+
+        <div id="params-section" class="query-params">
+            <div id="params-container"></div>
+            <button class="add-param" onclick="addQueryParam()">Add Query Parameter</button>
+            <div id="final-url" class="final-url"></div>
+        </div>
+
+        <div id="headers-editor" class="editor-container" style="display: none;"></div>
+        <div id="body-editor" class="editor-container" style="display: none;"></div>
+
+        <div class="response-container">
+            <h3>Response</h3>
+            <div id="status"></div>
+            <div id="response-editor" class="editor-container"></div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Ace editors
+        const headersEditor = ace.edit("headers-editor");
+        headersEditor.setTheme("ace/theme/monokai");
+        headersEditor.session.setMode("ace/mode/json");
+        headersEditor.setValue('{\n    "Content-Type": "application/json"\n}');
+
+        const bodyEditor = ace.edit("body-editor");
+        bodyEditor.setTheme("ace/theme/monokai");
+        bodyEditor.session.setMode("ace/mode/json");
+        bodyEditor.setValue('{\n    \n}');
+
+        const responseEditor = ace.edit("response-editor");
+        responseEditor.setTheme("ace/theme/monokai");
+        responseEditor.session.setMode("ace/mode/json");
+        responseEditor.setReadOnly(true);
+
+        // Query Parameters Management
+        function addQueryParam() {
+            const container = document.getElementById('params-container');
+            const row = document.createElement('div');
+            row.className = 'param-row';
+            row.innerHTML = `
+                <input type="text" class="param-input" placeholder="Key" onchange="updateFinalUrl()">
+                <input type="text" class="param-input" placeholder="Value" onchange="updateFinalUrl()">
+                <button class="remove-param" onclick="removeQueryParam(this)">×</button>
+            `;
+            container.appendChild(row);
+            updateFinalUrl();
+        }
+
+        function removeQueryParam(button) {
+            button.parentElement.remove();
+            updateFinalUrl();
+        }
+
+        function getQueryParams() {
+            const params = {};
+            const rows = document.querySelectorAll('.param-row');
+            rows.forEach(row => {
+                const inputs = row.querySelectorAll('input');
+                const key = inputs[0].value.trim();
+                const value = inputs[1].value.trim();
+                if (key && value) {
+                    params[key] = value;
+                }
+            });
+            return params;
+        }
+
+        function updateFinalUrl() {
+            const baseUrl = document.getElementById('url').value;
+            if (!baseUrl) {
+                document.getElementById('final-url').textContent = '';
+                return;
+            }
+
+            try {
+                const url = new URL(baseUrl);
+                const params = getQueryParams();
+                url.search = '';
+                Object.entries(params).forEach(([key, value]) => {
+                    if (key && value) {
+                        url.searchParams.append(key, value);
+                    }
+                });
+                document.getElementById('final-url').textContent = `Final URL: ${url.toString()}`;
+            } catch (error) {
+                document.getElementById('final-url').textContent = 'Invalid URL';
+            }
+        }
+
+        // Add input event listener to URL field
+        document.getElementById('url').addEventListener('input', updateFinalUrl);
+
+        function switchTab(tab) {
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.getElementById('params-section').style.display = tab === 'params' ? 'block' : 'none';
+            document.getElementById('headers-editor').style.display = tab === 'headers' ? 'block' : 'none';
+            document.getElementById('body-editor').style.display = tab === 'body' ? 'block' : 'none';
+        }
+
+        async function sendRequest() {
+            const baseUrl = document.getElementById('url').value;
+            const method = document.getElementById('method').value;
+            
+            try {
+                const queryParams = getQueryParams();
+                const headers = JSON.parse(headersEditor.getValue());
+                const body = method !== 'GET' ? JSON.parse(bodyEditor.getValue()) : undefined;
+
+                const response = await fetch('http://localhost:3001/make-request', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        baseUrl,
+                        queryParams,
+                        method,
+                        headers,
+                        body
+                    })
+                });
+
+                const data = await response.json();
+                
+                const statusEl = document.getElementById('status');
+                if (response.ok) {
+                    statusEl.className = 'status success';
+                    statusEl.textContent = `Status: ${data.status}`;
+                } else {
+                    statusEl.className = 'status error';
+                    statusEl.textContent = `Error: ${data.error}`;
+                }
+
+                responseEditor.setValue(JSON.stringify(data, null, 2));
+            } catch (error) {
+                const statusEl = document.getElementById('status');
+                statusEl.className = 'status error';
+                statusEl.textContent = `Error: ${error.message}`;
+                responseEditor.setValue(JSON.stringify({ error: error.message }, null, 2));
+            }
+        }
+
+        // Add initial query param row
+        addQueryParam();
+    </script>
+</body>
+</html>
