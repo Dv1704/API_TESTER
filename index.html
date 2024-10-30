@@ -261,7 +261,7 @@
                 const headers = JSON.parse(headersEditor.getValue());
                 const body = method !== 'GET' ? JSON.parse(bodyEditor.getValue()) : undefined;
 
-                const response = await fetch('https://dv1704.github.io/API_tester_Server/', {
+                const response = await fetch("https://api-tester-server.onrender.com", {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
