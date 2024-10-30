@@ -146,9 +146,9 @@
         </div>
 
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('params')">Query Params</button>
-            <button class="tab" onclick="switchTab('headers')">Headers</button>
-            <button class="tab" onclick="switchTab('body')">Body</button>
+            <button class="tab active" onclick="switchTab(this, 'params')">Query Params</button>
+            <button class="tab" onclick="switchTab(this, 'headers')">Headers</button>
+            <button class="tab" onclick="switchTab(this, 'body')">Body</button>
         </div>
 
         <div id="params-section" class="query-params">
@@ -242,10 +242,10 @@
         // Add input event listener to URL field
         document.getElementById('url').addEventListener('input', updateFinalUrl);
 
-        function switchTab(tab) {
+        function switchTab(tabButton, tab) {
             const tabs = document.querySelectorAll('.tab');
             tabs.forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
+            tabButton.classList.add('active');
 
             document.getElementById('params-section').style.display = tab === 'params' ? 'block' : 'none';
             document.getElementById('headers-editor').style.display = tab === 'headers' ? 'block' : 'none';
@@ -253,49 +253,46 @@
         }
 
         async function sendRequest() {
-            const baseUrl = document.getElementById('url').value;
+            const url = document.getElementById('url').value;
             const method = document.getElementById('method').value;
-            
-            try {
-                const queryParams = getQueryParams();
-                const headers = JSON.parse(headersEditor.getValue());
-                const body = method !== 'GET' ? JSON.parse(bodyEditor.getValue()) : undefined;
+            const headers = JSON.parse(headersEditor.getValue());
+            let body;
 
-                const response = await fetch("https://api-tester-server.onrender.com", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        baseUrl,
-                        queryParams,
-                        method,
-                        headers,
-                        body
-                    })
+            if (method === "POST" || method === "PUT" || method === "PATCH") {
+                body = bodyEditor.getValue();
+            }
+
+            const params = getQueryParams();
+            const finalUrl = new URL(url);
+
+            // Append query params to the URL
+            Object.entries(params).forEach(([key, value]) => {
+                if (key && value) {
+                    finalUrl.searchParams.append(key, value);
+                }
+            });
+
+            try {
+                const response = await fetch(finalUrl.toString(), {
+                    method: method,
+                    headers: headers,
+                    body: method === "GET" ? null : body
                 });
 
-                const data = await response.json();
-                
-                const statusEl = document.getElementById('status');
-                if (response.ok) {
-                    statusEl.className = 'status success';
-                    statusEl.textContent = `Status: ${data.status}`;
-                } else {
-                    statusEl.className = 'status error';
-                    statusEl.textContent = `Error: ${data.error}`;
-                }
-
-                responseEditor.setValue(JSON.stringify(data, null, 2));
+                const responseData = await response.json();
+                document.getElementById('status').innerHTML = `
+                    <span class="status success">Status: ${response.status}</span>
+                `;
+                responseEditor.setValue(JSON.stringify(responseData, null, 4));
             } catch (error) {
-                const statusEl = document.getElementById('status');
-                statusEl.className = 'status error';
-                statusEl.textContent = `Error: ${error.message}`;
-                responseEditor.setValue(JSON.stringify({ error: error.message }, null, 2));
+                document.getElementById('status').innerHTML = `
+                    <span class="status error">Error: ${error.message}</span>
+                `;
+                responseEditor.setValue('');
             }
         }
 
-        // Add initial query param row
+        // Add the initial query parameter row
         addQueryParam();
     </script>
 </body>
