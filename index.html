@@ -261,7 +261,7 @@
                 const headers = JSON.parse(headersEditor.getValue());
                 const body = method !== 'GET' ? JSON.parse(bodyEditor.getValue()) : undefined;
 
-                const response = await fetch('http://localhost:3001/make-request', {
+                const response = await fetch('https://api-tester-server.onrender.com/make-request', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
